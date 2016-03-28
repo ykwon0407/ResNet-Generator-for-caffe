@@ -16,17 +16,12 @@ def parse_args():
     parser = ArgumentParser(description=__doc__,
                             formatter_class=ArgumentDefaultsHelpFormatter)
 
-    parser.add_argument('solver_file',
-                        help='Output solver.prototxt file')
-    parser.add_argument('train_val_file',
-                        help='Output train_val.prototxt file')
+    parser.add_argument('deploy_file',
+                        help='Output deploy.prototxt file')
     parser.add_argument('--layer_number', nargs='*',
                         help=('Layer number for each layer stage.'),
-                        default=[3, 8, 36, 3])
-    parser.add_argument('-t', '--type', type=int,
-                        help=('0 for deploy.prototxt, 1 for train_val.prototxt.'),
-                        default=1)
-
+                        default=[3, 4, 6, 3])
+    
     args = parser.parse_args()
     return args
 
@@ -352,12 +347,9 @@ device_id: [0,1,6,8]'''%(train_val_name)
 
 def main():
     args = parse_args()
-    solver_str = generate_solver(args.train_val_file)
-    network_str = generate_train_val()
-    fp = open(args.solver_file, 'w')
-    fp.write(solver_str)
-    fp.close()
-    fp = open(args.train_val_file, 'w')
+    network_str = generate_deploy()
+
+    fp = open(args.deploy_file, 'w')
     fp.write(network_str)
     fp.close()
 
