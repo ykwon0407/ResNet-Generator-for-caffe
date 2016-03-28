@@ -5,6 +5,8 @@ Author: Yemin Shi
 Email: shiyemin@pku.edu.cn
 
 MSRA Paper: http://arxiv.org/pdf/1512.03385v1.pdf
+
+Thanks to Yemin Shi, this script also generates ResNet. This version is more likely to MSRA version.
 """
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 
@@ -28,8 +30,8 @@ def generate_data_layer():
 input: "data"
 input_dim: 1
 input_dim: 3
-input_dim: 512
-input_dim: 512
+input_dim: 448
+input_dim: 448
 '''
     return data_layer_str
 
@@ -148,7 +150,7 @@ layer {
   top: "loss1/acc"
   name: "loss1/acc"
   type: "Accuracy"
-}'''%(bottom, bottom, bottom)
+}'''%(bottom, bottom)
     return softmax_loss_str
 
 def generate_deploy():
