@@ -12,16 +12,14 @@ from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 def parse_args():
     """Parse input arguments
     """
-
     parser = ArgumentParser(description=__doc__,
                             formatter_class=ArgumentDefaultsHelpFormatter)
-
     parser.add_argument('deploy_file',
-                        help='Output deploy.prototxt file')
+                        help='Output deploy.prototxt file',
+                        default='resnet_50_deploy.prototxt')
     parser.add_argument('--layer_number', nargs='*',
                         help=('Layer number for each layer stage.'),
                         default=[3, 4, 6, 3])
-    
     args = parser.parse_args()
     return args
 
