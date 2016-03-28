@@ -6,7 +6,7 @@ Email: shiyemin@pku.edu.cn
 
 MSRA Paper: http://arxiv.org/pdf/1512.03385v1.pdf
 
-Thanks to Yemin Shi, this script also generates ResNet. This version is more likely to MSRA version.
+Thanks to Yemin Shi, this script also generates ResNet. This version is more likely to MSRA version. For resnet-50, the first convolution layer has bias term.
 """
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 
