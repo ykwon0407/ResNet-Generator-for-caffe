@@ -160,7 +160,10 @@ def generate_deploy():
     network_str += generate_conv_layer(7, 64, 2, 3, 'conv1', last_top)
     network_str += generate_bn_layer('bn_conv1', 'scale_conv1', 'conv1')
     network_str += generate_activation_layer('conv1_relu', 'conv1')
-    network_str += generate_pooling_layer(3, 2, 'MAX', 'pool1', 'conv1')
+    network_str += generate_conv_layer(7, 64, 2, 3, 'new_conv1', 'conv1')
+    network_str += generate_bn_layer('bn_new_conv1', 'scale_new_conv1', 'new_conv1')
+    network_str += generate_activation_layer('new_conv1_relu', 'new_conv1')
+    network_str += generate_pooling_layer(3, 2, 'MAX', 'pool1', 'new_conv1')
     '''stage 1'''
     last_top = 'pool1'
     network_str += generate_conv_layer(1, 256, 1, 0, 'res2a_branch1', last_top)
