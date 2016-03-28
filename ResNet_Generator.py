@@ -8,6 +8,7 @@ MSRA Paper: http://arxiv.org/pdf/1512.03385v1.pdf
 """
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 
+word = ['a','b','c']
 
 def parse_args():
     """Parse input arguments
@@ -33,37 +34,56 @@ input_dim: 512
 '''
     return data_layer_str
 
-def generate_conv_layer(kernel_size, kernel_num, stride, pad, layer_name, bottom, top, filler="msra"):
+def generate_conv_layer(kernel_size, kernel_num, stride, pad, layer_name, bottom, filler="msra"):
     conv_layer_str = '''layer {
   name: "%s"
   type: "Convolution"
   bottom: "%s"
   top: "%s"
-  param {
-    lr_mult: 1
-    decay_mult: 1
-  }
-  param {
-     lr_mult: 2
-     decay_mult: 0
-  }
   convolution_param {
     num_output: %d
     pad: %d
     kernel_size: %d
     stride: %d
+    bias_term: false
     weight_filler {
       type: "%s"
     }
-    bias_filler {
-      type: "constant"
-      value: 0
-    }
   }
-}'''%(layer_name, bottom, top, kernel_num, pad, kernel_size, stride, filler)
+}'''%(layer_name, bottom, layer_name, kernel_num, pad, kernel_size, stride, filler)
     return conv_layer_str
 
-def generate_pooling_layer(kernel_size, stride, pool_type, layer_name, bottom, top):
+def generate_bn_layer(batch_name, scale_name, bottom):
+    bn_layer_str = '''layer {
+	bottom: "%s"
+	top: "%s"
+	name: "%s"
+	type: "BatchNorm"
+	batch_norm_param {
+		use_global_stats: true
+	}
+}
+layer {
+	bottom: "%s"
+	top: "%s"
+	name: "%s"
+	type: "Scale"
+	scale_param {
+		bias_term: true
+	}
+}'''%(bottom, bottom, batch_name, bottom, bottom, scale_name)
+    return bn_layer_str
+    
+def generate_activation_layer(layer_name, bottom, act_type="ReLU"):
+    act_layer_str = '''layer {
+  name: "%s"
+  type: "%s"
+  bottom: "%s"
+  top: "%s"
+}'''%(layer_name, act_type, bottom, bottom)
+    return act_layer_str
+    
+def generate_pooling_layer(kernel_size, stride, pool_type, layer_name, bottom):
     pool_layer_str = '''layer {
   name: "%s"
   type: "Pooling"
@@ -74,9 +94,19 @@ def generate_pooling_layer(kernel_size, stride, pool_type, layer_name, bottom, t
     kernel_size: %d
     stride: %d
   }
-}'''%(layer_name, bottom, top, pool_type, kernel_size, stride)
+}'''%(layer_name, bottom, layer_name, pool_type, kernel_size, stride)
     return pool_layer_str
-
+    
+def generate_eltwise_layer(layer_name, bottom_1, bottom_2):
+    eltwise_layer_str = '''layer {
+  type: "Eltwise"
+  bottom: "%s"
+  bottom: "%s"
+  name: "%s"
+  top: "%s"
+}'''%(bottom_1, bottom_2, layer_name, layer_name)
+    return eltwise_layer_str
+    
 def generate_fc_layer(num_output, layer_name, bottom, top, filler="msra"):
     fc_layer_str = '''layer {
   name: "%s"
@@ -104,28 +134,6 @@ def generate_fc_layer(num_output, layer_name, bottom, top, filler="msra"):
   }
 }'''%(layer_name, bottom, top, num_output, filler)
     return fc_layer_str
-
-def generate_eltwise_layer(layer_name, bottom_1, bottom_2, top, op_type="SUM"):
-    eltwise_layer_str = '''layer {
-  name: "%s"
-  type: "Eltwise"
-  bottom: "%s"
-  bottom: "%s"
-  top: "%s"
-  eltwise_param {
-    operation: %s
-  }
-}'''%(layer_name, bottom_1, bottom_2, top, op_type)
-    return eltwise_layer_str
-
-def generate_activation_layer(layer_name, bottom, top, act_type="ReLU"):
-    act_layer_str = '''layer {
-  name: "%s"
-  type: "%s"
-  bottom: "%s"
-  top: "%s"
-}'''%(layer_name, act_type, bottom, top)
-    return act_layer_str
 
 def generate_softmax_loss(bottom):
     softmax_loss_str = '''layer {
@@ -160,50 +168,34 @@ layer {
 }'''%(bottom, bottom, bottom)
     return softmax_loss_str
 
-def generate_bn_layer(layer_name, bottom, top):
-    bn_layer_str = '''layer {
-  name: "%s"
-  type: "BatchNorm"
-  bottom: "%s"
-  top: "%s"
-  param {
-    lr_mult: 0
-  }
-  param {
-    lr_mult: 0
-  }
-  param {
-    lr_mult: 0
-  }
-}'''%(layer_name, bottom, top)
-    return bn_layer_str
-
 def generate_deploy():
     args = parse_args()
     network_str = generate_data_layer()
     '''before stage'''
     last_top = 'data'
-    network_str += generate_conv_layer(7, 64, 2, 0, 'conv1', last_top, 'conv1')
-    network_str += generate_bn_layer('conv1_bn', 'conv1', 'conv1_bn')
-    network_str += generate_activation_layer('conv1_relu', 'conv1_bn', 'conv1_bn', 'ReLU')
-    network_str += generate_pooling_layer(3, 2, 'MAX', 'pool1', 'conv1_bn', 'pool1')
+    network_str += generate_conv_layer(7, 64, 2, 3, 'conv1', last_top)
+    network_str += generate_bn_layer('bn_conv1', 'scale_conv1', 'conv1')
+    network_str += generate_activation_layer('conv1_relu', 'conv1')
+    network_str += generate_pooling_layer(3, 2, 'MAX', 'pool1', 'conv1')
     '''stage 1'''
     last_top = 'pool1'
-    network_str += generate_conv_layer(1, 256, 1, 0, 'conv1_output', last_top, 'conv1_output')
-    last_output = 'conv1_output'
+    network_str += generate_conv_layer(1, 256, 1, 0, 'res2a_branch1', last_top)
+    network_str += generate_bn_layer('bn2a_branch1', 'scale2a_branch1', 'res2a_branch1')
+    last_output = 'res2a_branch1'
     for l in xrange(1, args.layer_number[0]+1):
-        network_str += generate_conv_layer(1, 64, 1, 0, 'conv2_%d_1'%l, last_top, 'conv2_%d_1'%l)
-        network_str += generate_bn_layer('conv2_%d_1_bn'%l, 'conv2_%d_1'%l, 'conv2_%d_1_bn'%l)
-        network_str += generate_activation_layer('conv2_%d_1_relu'%l, 'conv2_%d_1_bn'%l, 'conv2_%d_1_bn'%l, 'ReLU')
-        network_str += generate_conv_layer(3, 64, 1, 1, 'conv2_%d_2'%l, 'conv2_%d_1_bn'%l, 'conv2_%d_2'%l)
-        network_str += generate_bn_layer('conv2_%d_2_bn'%l, 'conv2_%d_2'%l, 'conv2_%d_2_bn'%l)
-        network_str += generate_activation_layer('conv2_%d_2_relu'%l, 'conv2_%d_2_bn'%l, 'conv2_%d_2_bn'%l, 'ReLU')
-        network_str += generate_conv_layer(1, 256, 1, 0, 'conv2_%d_3'%l, 'conv2_%d_2_bn'%l, 'conv2_%d_3'%l)
-        network_str += generate_eltwise_layer('conv2_%d_sum'%l, last_output, 'conv2_%d_3'%l, 'conv2_%d_sum'%l, 'SUM')
-        network_str += generate_bn_layer('conv2_%d_sum_bn'%l, 'conv2_%d_sum'%l, 'conv2_%d_sum_bn'%l)
-        network_str += generate_activation_layer('conv2_%d_sum_relu'%l, 'conv2_%d_sum_bn'%l, 'conv2_%d_sum_bn'%l, 'ReLU')
-        last_top = 'conv2_%d_sum_bn'%l
-        last_output = 'conv2_%d_sum_bn'%l
+        network_str += generate_conv_layer(1, 64, 1, 0, 'res2%s_branch2a'%word[l], last_top)
+        network_str += generate_bn_layer('bn2%s_branch2a'%l, 'scale2%s_branch2a'%l, 'res2%s_branch2a'%word[l])
+        network_str += generate_activation_layer('res2%s_branch2a_relu'%word[l], 'res2%s_branch2a'%word[l])
+        network_str += generate_conv_layer(3, 64, 1, 1, 'res2%s_branch2b'%word[l], 'res2%s_branch2a'%word[l])
+        network_str += generate_bn_layer('bn2%s_branch2b'%l, 'scale2%s_branch2b'%l, 'res2%s_branch2b'%word[l])
+        network_str += generate_activation_layer('res2%s_branch2b_relu'%word[l], 'res2%s_branch2b'%word[l])
+        network_str += generate_conv_layer(1, 256, 1, 0, 'res2%s_branch2c'%word[l], 'res2%s_branch2b'%word[l])
+        network_str += generate_bn_layer('bn2%s_branch2c'%l, 'scale2%s_branch2c'%l, 'res2%s_branch2c'%word[l])
+        network_str += generate_eltwise_layer('res2%s'%word[l], last_output, 'res2%s_branch2c'%word[l])
+        network_str += generate_activation_layer('res2%s_relu'%word[l],'res2%s'%word[l])
+        last_top = 'res2%s'%word[l]
+        last_output = 'res2%s'%word[l]
+    
     network_str += generate_conv_layer(1, 512, 2, 0, 'conv2_output', last_top, 'conv2_output')
     last_output = 'conv2_output'
     '''stage 2'''
