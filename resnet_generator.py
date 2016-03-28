@@ -1,12 +1,16 @@
 #!/usr/bin/env python
 """
 Generate the residule learning network.
-Author: Yemin Shi
-Email: shiyemin@pku.edu.cn
+Author: Yongchan Kwon
+Email: ykwon0407@snu.ac.kr
+
+Thanks to Yemin Shi (https://github.com/shiyemin/ResNet-Generator-for-caffe), 
+this script also generates ResNet. This version is more likely to MSRA version. 
+For resnet-50, the first convolution layer has bias term.
 
 MSRA Paper: http://arxiv.org/pdf/1512.03385v1.pdf
 
-Thanks to Yemin Shi, this script also generates ResNet. This version is more likely to MSRA version. For resnet-50, the first convolution layer has bias term.
+Disclaimer: This work was highly referred Yemin Shi's script
 """
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 
