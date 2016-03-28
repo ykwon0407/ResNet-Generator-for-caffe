@@ -8,15 +8,14 @@ MSRA Paper: http://arxiv.org/pdf/1512.03385v1.pdf
 """
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 
-word = ['a','b','c']
+word = ['o','a','b','c']
 
 def parse_args():
     """Parse input arguments
     """
     parser = ArgumentParser(description=__doc__,
                             formatter_class=ArgumentDefaultsHelpFormatter)
-    parser.add_argument('deploy_file',
-                        help='Output deploy.prototxt file',
+    parser.add_argument('--deploy_file',
                         default='resnet_50_deploy.prototxt')
     parser.add_argument('--layer_number', nargs='*',
                         help=('Layer number for each layer stage.'),
