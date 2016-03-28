@@ -28,8 +28,8 @@ def generate_data_layer():
 input: "data"
 input_dim: 1
 input_dim: 3
-input_dim: 224
-input_dim: 224
+input_dim: 512
+input_dim: 512
 '''
     return data_layer_str
 
@@ -286,26 +286,6 @@ def generate_deploy():
     network_str += generate_fc_layer(1000, 'fc', 'pool2', 'fc', 'gaussian')
     network_str += generate_softmax_loss('fc')
     return network_str
-
-def generate_solver(train_val_name):
-    solver_str = '''net: "%s"
-test_iter: 1000
-test_interval: 6000
-test_initialization: false
-display: 60
-base_lr: 0.1
-lr_policy: "multistep"
-stepvalue: 300000
-stepvalue: 500000
-gamma: 0.1
-max_iter: 600000
-momentum: 0.9
-weight_decay: 0.0001
-snapshot: 6000
-snapshot_prefix: "pku_resnet"
-solver_mode: GPU
-device_id: [0,1,6,8]'''%(train_val_name)
-    return solver_str
 
 def main():
     args = parse_args()
