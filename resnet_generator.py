@@ -51,7 +51,8 @@ def generate_conv_layer(kernel_size, kernel_num, stride, pad, layer_name, bottom
       type: "%s"
     }
   }
-}'''%(layer_name, bottom, layer_name, kernel_num, pad, kernel_size, stride, filler)
+}
+'''%(layer_name, bottom, layer_name, kernel_num, pad, kernel_size, stride, filler)
     return conv_layer_str
 
 def generate_bn_layer(batch_name, scale_name, bottom):
@@ -72,7 +73,8 @@ layer {
 	scale_param {
 		bias_term: true
 	}
-}'''%(bottom, bottom, batch_name, bottom, bottom, scale_name)
+}
+'''%(bottom, bottom, batch_name, bottom, bottom, scale_name)
     return bn_layer_str
     
 def generate_activation_layer(layer_name, bottom, act_type="ReLU"):
@@ -81,7 +83,8 @@ def generate_activation_layer(layer_name, bottom, act_type="ReLU"):
   type: "%s"
   bottom: "%s"
   top: "%s"
-}'''%(layer_name, act_type, bottom, bottom)
+}
+'''%(layer_name, act_type, bottom, bottom)
     return act_layer_str
     
 def generate_pooling_layer(kernel_size, stride, pool_type, layer_name, bottom):
@@ -95,7 +98,8 @@ def generate_pooling_layer(kernel_size, stride, pool_type, layer_name, bottom):
     kernel_size: %d
     stride: %d
   }
-}'''%(layer_name, bottom, layer_name, pool_type, kernel_size, stride)
+}
+'''%(layer_name, bottom, layer_name, pool_type, kernel_size, stride)
     return pool_layer_str
     
 def generate_eltwise_layer(layer_name, bottom_1, bottom_2):
@@ -105,7 +109,8 @@ def generate_eltwise_layer(layer_name, bottom_1, bottom_2):
   bottom: "%s"
   name: "%s"
   top: "%s"
-}'''%(bottom_1, bottom_2, layer_name, layer_name)
+}
+'''%(bottom_1, bottom_2, layer_name, layer_name)
     return eltwise_layer_str
     
 def generate_fc_layer(num_output, layer_name, bottom, filler="gaussian"):
@@ -133,7 +138,8 @@ def generate_fc_layer(num_output, layer_name, bottom, filler="gaussian"):
        value: 0
      }
   }
-}'''%(layer_name, bottom, layer_name, num_output, filler)
+}
+'''%(layer_name, bottom, layer_name, num_output, filler)
     return fc_layer_str
 
 def generate_softmax_loss(bottom):
@@ -150,7 +156,8 @@ layer {
   top: "loss1/acc"
   name: "loss1/acc"
   type: "Accuracy"
-}'''%(bottom, bottom)
+}
+'''%(bottom, bottom)
     return softmax_loss_str
 
 def generate_deploy():
