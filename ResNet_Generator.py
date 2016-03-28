@@ -107,7 +107,7 @@ def generate_eltwise_layer(layer_name, bottom_1, bottom_2):
 }'''%(bottom_1, bottom_2, layer_name, layer_name)
     return eltwise_layer_str
     
-def generate_fc_layer(num_output, layer_name, bottom, top, filler="msra"):
+def generate_fc_layer(num_output, layer_name, bottom, filler="gaussian"):
     fc_layer_str = '''layer {
   name: "%s"
   type: "InnerProduct"
@@ -132,39 +132,23 @@ def generate_fc_layer(num_output, layer_name, bottom, top, filler="msra"):
        value: 0
      }
   }
-}'''%(layer_name, bottom, top, num_output, filler)
+}'''%(layer_name, bottom, layer_name, num_output, filler)
     return fc_layer_str
 
 def generate_softmax_loss(bottom):
     softmax_loss_str = '''layer {
-  name: "loss"
+  name: "loss2/softmax"
   type: "SoftmaxWithLoss"
   bottom: "%s"
   bottom: "label"
-  top: "loss"
+  top: "loss2/softmax"
 }
 layer {
-  name: "acc/top-1"
-  type: "Accuracy"
   bottom: "%s"
   bottom: "label"
-  top: "acc/top-1"
-  include {
-    phase: TEST
-  }
-}
-layer {
-  name: "acc/top-5"
+  top: "loss1/acc"
+  name: "loss1/acc"
   type: "Accuracy"
-  bottom: "%s"
-  bottom: "label"
-  top: "acc/top-5"
-  include {
-    phase: TEST
-  }
-  accuracy_param {
-    top_k: 5
-  }
 }'''%(bottom, bottom, bottom)
     return softmax_loss_str
 
@@ -195,94 +179,96 @@ def generate_deploy():
         network_str += generate_activation_layer('res2%s_relu'%word[l],'res2%s'%word[l])
         last_top = 'res2%s'%word[l]
         last_output = 'res2%s'%word[l]
-    
-    network_str += generate_conv_layer(1, 512, 2, 0, 'conv2_output', last_top, 'conv2_output')
-    last_output = 'conv2_output'
+    '''Random Initialization'''
+    network_str += generate_conv_layer(1, 512, 2, 0, 'res3_1_branch1', last_top)
+    network_str += generate_bn_layer('bn3_1_branch1', 'scale3_1_branch1', 'res2_1_branch1')
+    last_output = 'res3_1_branch1'
     '''stage 2'''
-    network_str += generate_conv_layer(1, 128, 2, 0, 'conv3_1_1', last_top, 'conv3_1_1')
-    network_str += generate_bn_layer('conv3_1_1_bn', 'conv3_1_1', 'conv3_1_1_bn')
-    network_str += generate_activation_layer('conv3_1_1_relu', 'conv3_1_1_bn', 'conv3_1_1_bn', 'ReLU')
-    network_str += generate_conv_layer(3, 128, 1, 1, 'conv3_1_2', 'conv3_1_1_bn', 'conv3_1_2')
-    network_str += generate_bn_layer('conv3_1_2_bn', 'conv3_1_2', 'conv3_1_2_bn')
-    network_str += generate_activation_layer('conv3_1_2_relu', 'conv3_1_2_bn', 'conv3_1_2_bn', 'ReLU')
-    network_str += generate_conv_layer(1, 512, 1, 0, 'conv3_1_3', 'conv3_1_2_bn', 'conv3_1_3')
-    network_str += generate_eltwise_layer('conv3_1_sum', last_output, 'conv3_1_3', 'conv3_1_sum', 'SUM')
-    network_str += generate_bn_layer('conv3_1_sum_bn', 'conv3_1_sum', 'conv3_1_sum_bn')
-    network_str += generate_activation_layer('conv3_1_sum_relu', 'conv3_1_sum_bn', 'conv3_1_sum_bn', 'ReLU')
-    last_top = 'conv3_1_sum_bn'
+    network_str += generate_conv_layer(1, 128, 2, 0, 'res3_1_branch2a', last_top)
+    network_str += generate_bn_layer('bn3_1_branch2a', 'scale3_1_branch2a', 'res3_1_branch2a')
+    network_str += generate_activation_layer('res3_1_branch2a_relu', 'res3_1_branch2a')
+    network_str += generate_conv_layer(3, 128, 1, 1, 'res3_1_branch2b', 'res3_1_branch2a')
+    network_str += generate_bn_layer('bn3_1_branch2b', 'scale3_1_branch2b', 'res3_1_branch2b')
+    network_str += generate_activation_layer('res3_1_branch2b_relu', 'res3_1_branch2b')
+    network_str += generate_conv_layer(1, 512, 1, 0, 'res3_1_branch2c', 'res3_1_branch2b')
+    network_str += generate_bn_layer('bn3_1_branch2c', 'scale3_1_branch2c', 'res3_1_branch2c')
+    network_str += generate_eltwise_layer('res3_1', last_output, 'res3_1_branch2c')
+    network_str += generate_activation_layer('res3_1_relu', 'res3_1')
+    last_top = 'res3_1'
     for l in xrange(2, args.layer_number[1]+1):
-        network_str += generate_conv_layer(1, 128, 1, 0, 'conv3_%d_1'%l, last_top, 'conv3_%d_1'%l)
-        network_str += generate_bn_layer('conv3_%d_1_bn'%l, 'conv3_%d_1'%l, 'conv3_%d_1_bn'%l)
-        network_str += generate_activation_layer('conv3_%d_1_relu'%l, 'conv3_%d_1_bn'%l, 'conv3_%d_1_bn'%l, 'ReLU')
-        network_str += generate_conv_layer(3, 128, 1, 1, 'conv3_%d_2'%l, 'conv3_%d_1_bn'%l, 'conv3_%d_2'%l)
-        network_str += generate_bn_layer('conv3_%d_2_bn'%l, 'conv3_%d_2'%l, 'conv3_%d_2_bn'%l)
-        network_str += generate_activation_layer('conv3_%d_2_relu'%l, 'conv3_%d_2_bn'%l, 'conv3_%d_2_bn'%l, 'ReLU')
-        network_str += generate_conv_layer(1, 512, 1, 0, 'conv3_%d_3'%l, 'conv3_%d_2_bn'%l, 'conv3_%d_3'%l)
-        network_str += generate_eltwise_layer('conv3_%d_sum'%l, last_top, 'conv3_%d_3'%l, 'conv3_%d_sum'%l, 'SUM')
-        network_str += generate_bn_layer('conv3_%d_sum_bn'%l, 'conv3_%d_sum'%l, 'conv3_%d_sum_bn'%l)
-        network_str += generate_activation_layer('conv3_%d_sum_relu'%l, 'conv3_%d_sum_bn'%l, 'conv3_%d_sum_bn'%l, 'ReLU')
-        last_top = 'conv3_%d_sum_bn'%l
-    network_str += generate_conv_layer(1, 1024, 2, 0, 'conv3_output', last_top, 'conv3_output')
-    last_output = 'conv3_output'
+        network_str += generate_conv_layer(1, 128, 1, 0, 'res3_%d_branch2a'%l, last_top)
+        network_str += generate_bn_layer('bn3_%d_branch2a'%l, 'scale3_%d_branch2a'%l, 'res3_%d_branch2a'%l)
+        network_str += generate_activation_layer('res3_%d_branch2a_relu'%l, 'res3_%d_branch2a'%l)
+        network_str += generate_conv_layer(3, 128, 1, 1, 'res3_%d_branch2b'%l, 'res3_%d_branch2a'%l)
+        network_str += generate_bn_layer('bn3_%d_branch2b'%l, 'scale3_%d_branch2b'%l, 'res3_%d_branch2b'%l)
+        network_str += generate_activation_layer('res3_%d_branch2b_relu'%l, 'res3_%d_branch2b'%l)
+        network_str += generate_conv_layer(1, 512, 1, 0, 'res3_%d_branch2c'%l, 'res3_%d_branch2b'%l)
+        network_str += generate_bn_layer('bn3_%d_branch2c'%l, 'scale3_%d_branch2c'%l, 'res3_%d_branch2c'%l)
+        network_str += generate_eltwise_layer('res3_%d'%l, last_top, 'res3_%d_branch2c'%l)
+        network_str += generate_activation_layer('res3_%d_relu'%l, 'res3_%d'%l)
+        last_top = 'res3_%d'%l
+    network_str += generate_conv_layer(1, 1024, 2, 0, 'res4_1_branch1', last_top)
+    network_str += generate_bn_layer('bn4_1_branch1', 'scale4_1_branch1', 'res4_1_branch1')
+    last_output = 'res4_1_branch1'
     '''stage 3'''
-    network_str += generate_conv_layer(1, 256, 2, 0, 'conv4_1_1', last_top, 'conv4_1_1')
-    network_str += generate_bn_layer('conv4_1_1_bn', 'conv4_1_1', 'conv4_1_1_bn')
-    network_str += generate_activation_layer('conv4_1_1_relu', 'conv4_1_1_bn', 'conv4_1_1_bn', 'ReLU')
-    network_str += generate_conv_layer(3, 256, 1, 1, 'conv4_1_2', 'conv4_1_1_bn', 'conv4_1_2')
-    network_str += generate_bn_layer('conv4_1_2_bn', 'conv4_1_2', 'conv4_1_2_bn')
-    network_str += generate_activation_layer('conv4_1_2_relu', 'conv4_1_2_bn', 'conv4_1_2_bn', 'ReLU')
-    network_str += generate_conv_layer(1, 1024, 1, 0, 'conv4_1_3', 'conv4_1_2_bn', 'conv4_1_3')
-    network_str += generate_eltwise_layer('conv4_1_sum', last_output, 'conv4_1_3', 'conv4_1_sum', 'SUM')
-    network_str += generate_bn_layer('conv4_1_sum_bn', 'conv4_1_sum', 'conv4_1_sum_bn')
-    network_str += generate_activation_layer('conv4_1_sum_relu', 'conv4_1_sum_bn', 'conv4_1_sum_bn', 'ReLU')
-    last_top = 'conv4_1_sum_bn'
+    network_str += generate_conv_layer(1, 256, 2, 0, 'res4_1_branch2a', last_top)
+    network_str += generate_bn_layer('bn4_1_branch2a', 'scale4_1_branch2a', 'res4_1_branch2a')
+    network_str += generate_activation_layer('res4_1_branch2a_relu', 'res4_1_branch2a')
+    network_str += generate_conv_layer(3, 256, 1, 1, 'res4_1_branch2b', 'res4_1_branch2a')
+    network_str += generate_bn_layer('bn4_1_branch2b', 'scale4_1_branch2b', 'res4_1_branch2b')
+    network_str += generate_activation_layer('res4_1_branch2b_relu', 'res4_1_branch2b')
+    network_str += generate_conv_layer(1, 1024, 1, 0, 'res4_1_branch2c', 'res4_1_branch2b')
+    network_str += generate_bn_layer('bn4_1_branch2c', 'scale4_1_branch2c', 'res4_1_branch2c')
+    network_str += generate_eltwise_layer('res4_1', last_output, 'res4_1_branch2c')
+    network_str += generate_activation_layer('res4_1_relu', 'res4_1')
+    last_top = 'res4_1'
     for l in xrange(2, args.layer_number[2]+1):
-        network_str += generate_conv_layer(1, 256, 1, 0, 'conv4_%d_1'%l, last_top, 'conv4_%d_1'%l)
-        network_str += generate_bn_layer('conv4_%d_1_bn'%l, 'conv4_%d_1'%l, 'conv4_%d_1_bn'%l)
-        network_str += generate_activation_layer('conv4_%d_1_relu'%l, 'conv4_%d_1_bn'%l, 'conv4_%d_1_bn'%l, 'ReLU')
-        network_str += generate_conv_layer(3, 256, 1, 1, 'conv4_%d_2'%l, 'conv4_%d_1_bn'%l, 'conv4_%d_2'%l)
-        network_str += generate_bn_layer('conv4_%d_2_bn'%l, 'conv4_%d_2'%l, 'conv4_%d_2_bn'%l)
-        network_str += generate_activation_layer('conv4_%d_2_relu'%l, 'conv4_%d_2_bn'%l, 'conv4_%d_2_bn'%l, 'ReLU')
-        network_str += generate_conv_layer(1, 1024, 1, 0, 'conv4_%d_3'%l, 'conv4_%d_2_bn'%l, 'conv4_%d_3'%l)
-        network_str += generate_eltwise_layer('conv4_%d_sum'%l, last_top, 'conv4_%d_3'%l, 'conv4_%d_sum'%l, 'SUM')
-        network_str += generate_bn_layer('conv4_%d_sum_bn'%l, 'conv4_%d_sum'%l, 'conv4_%d_sum_bn'%l)
-        network_str += generate_activation_layer('conv4_%d_sum_relu'%l, 'conv4_%d_sum_bn'%l, 'conv4_%d_sum_bn'%l, 'ReLU')
-        last_top = 'conv4_%d_sum_bn'%l
-    network_str += generate_conv_layer(1, 2048, 2, 0, 'conv4_output', last_top, 'conv4_output')
-    last_output = 'conv4_output'
+    	network_str += generate_conv_layer(1, 256, 1, 0, 'res4_%d_branch2a'%l, last_top)
+        network_str += generate_bn_layer('bn4_%d_branch2a'%l, 'scale4_%d_branch2a'%l, 'res4_%d_branch2a'%l)
+        network_str += generate_activation_layer('res4_%d_branch2a_relu'%l, 'res4_%d_branch2a'%l)
+        network_str += generate_conv_layer(3, 256, 1, 1, 'res4_%d_branch2b'%l, 'res4_%d_branch2a'%l)
+        network_str += generate_bn_layer('bn4_%d_branch2b'%l, 'scale4_%d_branch2b'%l, 'res4_%d_branch2b'%l)
+        network_str += generate_activation_layer('res4_%d_branch2b_relu'%l, 'res4_%d_branch2b'%l)
+        network_str += generate_conv_layer(1, 1024, 1, 0, 'res4_%d_branch2c'%l, 'res4_%d_branch2b'%l)
+        network_str += generate_bn_layer('bn4_%d_branch2c'%l, 'scale4_%d_branch2c'%l, 'res4_%d_branch2c'%l)
+        network_str += generate_eltwise_layer('res4_%d'%l, last_top, 'res4_%d_branch2c'%l)
+        network_str += generate_activation_layer('res4_%d_relu'%l, 'res4_%d'%l)
+        last_top = 'res4_%d'%l
+    network_str += generate_conv_layer(1, 2048, 2, 0, 'res5_1_branch1', last_top)
+    network_str += generate_bn_layer('bn5_1_branch1', 'scale5_1_branch1', 'res5_1_branch1')
+    last_output = 'res5_1_branch1'
     '''stage 4'''
-    network_str += generate_conv_layer(1, 512, 2, 0, 'conv5_1_1', last_top, 'conv5_1_1')
-    network_str += generate_bn_layer('conv5_1_1_bn', 'conv5_1_1', 'conv5_1_1_bn')
-    network_str += generate_activation_layer('conv5_1_1_relu', 'conv5_1_1_bn', 'conv5_1_1_bn', 'ReLU')
-    network_str += generate_conv_layer(3, 512, 1, 1, 'conv5_1_2', 'conv5_1_1_bn', 'conv5_1_2')
-    network_str += generate_bn_layer('conv5_1_2_bn', 'conv5_1_2', 'conv5_1_2_bn')
-    network_str += generate_activation_layer('conv5_1_2_relu', 'conv5_1_2_bn', 'conv5_1_2_bn', 'ReLU')
-    network_str += generate_conv_layer(1, 2048, 1, 0, 'conv5_1_3', 'conv5_1_2_bn', 'conv5_1_3')
-    network_str += generate_eltwise_layer('conv5_1_sum', last_output, 'conv5_1_3', 'conv5_1_sum', 'SUM')
-    network_str += generate_bn_layer('conv5_1_sum_bn', 'conv5_1_sum', 'conv5_1_sum_bn')
-    network_str += generate_activation_layer('conv5_1_sum_relu', 'conv5_1_sum_bn', 'conv5_1_sum_bn', 'ReLU')
-    last_top = 'conv5_1_sum_bn'
+    network_str += generate_conv_layer(1, 512, 2, 0, 'res_5_1_branch2a', last_top)
+    network_str += generate_bn_layer('bn5_1_branch2a', 'scale5_1_branch2a', 'res5_1_branch2a')
+    network_str += generate_activation_layer('res5_1_branch2a_relu', 'res5_1_branch2a')
+    network_str += generate_conv_layer(3, 512, 1, 1, 'res5_1_branch2b', 'res5_1_branch2a')
+    network_str += generate_bn_layer('bn5_1_branch2b', 'scale5_1_branch2b', 'res5_1_branch2b')
+    network_str += generate_activation_layer('res5_1_branch2b_relu', 'res5_1_branch2b')
+    network_str += generate_conv_layer(1, 2048, 1, 0, 'res5_1_branch2c', 'res5_1_branch2b')
+    network_str += generate_bn_layer('bn5_1_branch2c', 'scale5_1_branch2c', 'res5_1_branch2c')
+    network_str += generate_eltwise_layer('res5_1', last_output, 'res5_1_branch2c')
+    network_str += generate_activation_layer('res5_1_relu', 'res5_1')
+    last_top = 'res5_1'
     for l in xrange(2, args.layer_number[3]+1):
-        network_str += generate_conv_layer(1, 512, 1, 0, 'conv5_%d_1'%l, last_top, 'conv5_%d_1'%l)
-        network_str += generate_bn_layer('conv5_%d_1_bn'%l, 'conv5_%d_1'%l, 'conv5_%d_1_bn'%l)
-        network_str += generate_activation_layer('conv5_%d_1_relu'%l, 'conv5_%d_1_bn'%l, 'conv5_%d_1_bn'%l, 'ReLU')
-        network_str += generate_conv_layer(3, 512, 1, 1, 'conv5_%d_2'%l, 'conv5_%d_1_bn'%l, 'conv5_%d_2'%l)
-        network_str += generate_bn_layer('conv5_%d_2_bn'%l, 'conv5_%d_2'%l, 'conv5_%d_2_bn'%l)
-        network_str += generate_activation_layer('conv5_%d_2_relu'%l, 'conv5_%d_2_bn'%l, 'conv5_%d_2_bn'%l, 'ReLU')
-        network_str += generate_conv_layer(1, 2048, 1, 0, 'conv5_%d_3'%l, 'conv5_%d_2_bn'%l, 'conv5_%d_3'%l)
-        network_str += generate_eltwise_layer('conv5_%d_sum'%l, last_top, 'conv5_%d_3'%l, 'conv5_%d_sum'%l, 'SUM')
-        network_str += generate_bn_layer('conv5_%d_sum_bn'%l, 'conv5_%d_sum'%l, 'conv5_%d_sum_bn'%l)
-        network_str += generate_activation_layer('conv5_%d_sum_relu'%l, 'conv5_%d_sum_bn'%l, 'conv5_%d_sum_bn'%l, 'ReLU')
-        last_top = 'conv5_%d_sum_bn'%l
-    network_str += generate_pooling_layer(7, 1, 'AVE', 'pool2', last_top, 'pool2')
-    network_str += generate_fc_layer(1000, 'fc', 'pool2', 'fc', 'gaussian')
-    network_str += generate_softmax_loss('fc')
+    	network_str += generate_conv_layer(1, 512, 1, 0, 'res5_%d_branch2a'%l, last_top)
+        network_str += generate_bn_layer('bn5_%d_branch2a'%l, 'scale5_%d_branch2a'%l, 'res5_%d_branch2a'%l)
+        network_str += generate_activation_layer('res5_%d_branch2a_relu'%l, 'res5_%d_branch2a'%l)
+        network_str += generate_conv_layer(3, 512, 1, 1, 'res5_%d_branch2b'%l, 'res5_%d_branch2a'%l)
+        network_str += generate_bn_layer('bn5_%d_branch2b'%l, 'scale5_%d_branch2b'%l, 'res5_%d_branch2b'%l)
+        network_str += generate_activation_layer('res5_%d_branch2b_relu'%l, 'res5_%d_branch2b'%l)
+        network_str += generate_conv_layer(1, 2048, 1, 0, 'res5_%d_branch2c'%l, 'res5_%d_branch2b'%l)
+        network_str += generate_bn_layer('bn5_%d_branch2c'%l, 'scale5_%d_branch2c'%l, 'res5_%d_branch2c'%l)
+        network_str += generate_eltwise_layer('res5_%d'%l, last_top, 'res5_%d_branch2c'%l)
+        network_str += generate_activation_layer('res5_%d_relu'%l, 'res5_%d'%l)
+        last_top = 'res5_%d'%l
+    network_str += generate_pooling_layer(7, 1, 'AVE', 'pool5', last_top)
+    network_str += generate_fc_layer(5, 'fc5', 'pool5', 'gaussian')
+    network_str += generate_softmax_loss('fc5')
     return network_str
 
 def main():
     args = parse_args()
     network_str = generate_deploy()
-
     fp = open(args.deploy_file, 'w')
     fp.write(network_str)
     fp.close()
