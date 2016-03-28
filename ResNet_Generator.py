@@ -27,48 +27,12 @@ def parse_args():
 
 def generate_data_layer():
     data_layer_str = '''name: "ResNet"
-layer {
-  name: "data"
-  type: "Data"
-  top: "data"
-  top: "label"
-  include {
-    phase: TRAIN
-  }
-  transform_param {
-    mirror: true
-    crop_size: 224
-    mean_value: 104
-    mean_value: 117
-    mean_value: 123
-  }
-  data_param {
-    source: "../imagenet/ilsvrc12_train_lmdb"
-    batch_size: 8
-    backend: LMDB
-  }
-}
-layer {
-  name: "data"
-  type: "Data"
-  top: "data"
-  top: "label"
-  include {
-    phase: TEST
-  }
-  transform_param {
-    mirror: false
-    crop_size: 224
-    mean_value: 104
-    mean_value: 117
-    mean_value: 123
-  }
-  data_param {
-    source: "../imagenet/ilsvrc12_val_lmdb"
-    batch_size: 5
-    backend: LMDB
-  }
-}'''
+input: "data"
+input_dim: 1
+input_dim: 3
+input_dim: 224
+input_dim: 224
+'''
     return data_layer_str
 
 def generate_conv_layer(kernel_size, kernel_num, stride, pad, layer_name, bottom, top, filler="msra"):
@@ -216,7 +180,7 @@ def generate_bn_layer(layer_name, bottom, top):
 }'''%(layer_name, bottom, top)
     return bn_layer_str
 
-def generate_train_val():
+def generate_deploy():
     args = parse_args()
     network_str = generate_data_layer()
     '''before stage'''
